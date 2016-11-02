@@ -1,6 +1,9 @@
 # rmmv_fow
 Fog of War System for RPG Maker MV
+Author: CityShrimp
 Version: 0.1
+
+**Important**: Have not been tested with RMMV
 
 Features
 ========
