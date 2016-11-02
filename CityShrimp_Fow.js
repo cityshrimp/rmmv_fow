@@ -10,6 +10,8 @@ Game_Event.prototype.initialize = function(mapId, eventId) {
     this._direction = 0;
     this.visible = 0;
     this.visible_set = new Set();
+    
+    $gameMap.setEvent(eventId, this);
 };
 Game_Event.prototype.moveto = function(x, y) {
     this.x = x;
@@ -57,7 +59,10 @@ function GameMap(w, l) {
         }
     }
     
-    this.events = function() { return [];};
+    this._events = new Array();
+    this.events = function() { return this._events;};
+    this.event = function(event_id) { return this._events[event_id]};
+    this.setEvent = function(event_id, e) { this._events[event_id] =  e};
     
     this.regionId = function(x, y)
     {
@@ -68,10 +73,11 @@ var $gameMap = new GameMap(11, 11);
 function dataMap() {
     this.meta = new Map();
     this.meta['fow_enabled'] = true;
-    /*this.meta['fow_player_vision'] = true;
-    this.meta['fow_player_range'] = 3;
+    this.meta['fow_player_range'] = 5;
+    /*
     this.meta['fow_type'] = 3;
-    this.meta['fow_strict_diagonals'] = true;*/
+    this.meta['fow_strict_diagonals'] = true;
+    */
 }
 $dataMap = new dataMap();
 
@@ -96,10 +102,6 @@ function Sprite(image) {
  * @desc Enable fog by default in any map.
  * @default false
  *
- * @param Fog Type
- * @desc Default fog type. 1 - Diamond, 2 - Square, 3 - Directional (does not work with 8 or 16 directional movement)
- * @default 1
- *
  * @param Fog Opacity
  * @desc Default opacity of the fog sprites, between 0 to 1
  * @default 0.5
@@ -116,13 +118,29 @@ function Sprite(image) {
  * @desc Player has vision. Can be toggled with plugin command.
  * @default true
  *
- * @param Player Range
+ * @param Player Vision Range
  * @desc Player's vision range. Can be modified with plugin command.
  * @default 3
  *
- * @param Default Range
+ * @param Player Vision Type
+ * @desc Default vision type for Player. 1 - Diamond, 2 - Square, 3 - Directional (does not work with 8 or 16 directional movement)
+ * @default 1
+ *
+ * @param Player Flying Vision
+ * @desc Whether Player has unobstructed vision or not.
+ * @default false
+ *
+ * @param Origin Vision Range
  * @desc This is the default vision range for origin events.
  * @default 3
+ *
+ * @param Origin Vision Type
+ * @desc Default vision type for origin events (except Player). 1 - Diamond, 2 - Square, 3 - Directional (does not work with 8 or 16 directional movement)
+ * @default 1
+ *
+ * @param Origin Flying Vision
+ * @desc Whether origin events will have unobstructed vision by default or not
+ * @default false
  *
  * @param Plain RegionId
  * @desc RegionId for plain tiles
@@ -165,6 +183,9 @@ function Sprite(image) {
  * <fow_strict_diagonals>
  * desc: Eanbles strict diagonals visibility detection
  *
+ * <fow_flying_origins>
+ * desc: Origins will have unobstructed vision.
+ *
  * <fow_player_vision>
  * desc: Player has vision for this map
  *
@@ -173,8 +194,17 @@ function Sprite(image) {
  *
  * ===Event Notetag===
  *
- * <fow_origin: (range)>
- * desc: Event will be able to reveal fog. (range) is the vision range of the event. Can 
+ * <fow_origin>
+ * desc: Event will be able to reveal fog. (range) is the vision range of the event.
+ *
+ * <fow_origin_range: (range)>
+ * desc: Set the origin event's vision range.
+ *
+ * <fow_origin_type: (type)>
+ * desc: Set the origin event's vision type.
+ *
+ * <fow_origin_flying: (bool)>
+ * desc: Set the origin's flying (unobstructed vision) attribute
  *
  * <fow_target>
  * desc: Event will be hidden unless on a revealed tile.
@@ -194,13 +224,28 @@ function Sprite(image) {
  * desc: if put in the map note tags then scrolling will be back to normal instead of grid scrolling.
  *
  * cs_fow set_player_range <integer>
- * desc: Set player's vision range.
+ * desc: Set the player's vision range.
  *
- * cs_fow add_origin <event id> [<range>]
- * desc: if put in the map note tags then scrolling will be back to normal instead of grid scrolling.
+ * cs_fow set_player_type <event id> <type>
+ * desc: Set the player's vision type.
+ *
+ * cs_fow set_player_flying <event id> <bool>
+ * desc: Set the player's flying (unobstructed vision) attribute.
+ *
+ * cs_fow add_origin <event id>
+ * desc: Event will be able to reveal fog.
+ *
+ * cs_fow set_origin_range <event id> <range>
+ * desc: Set the origin's vision range.
+ *
+ * cs_fow set_origin_type <event id> <type>
+ * desc: Set the origin's vision type.
+ *
+ * cs_fow set_origin_flying <event id> <bool>
+ * desc: Set the origin's flying (unobstructed vision) attribute.
  *
  * cs_fow remove_origin <event id>
- * desc: Remove event from origin list. Does not work on events with <fow_origin> notetag. 
+ * desc: Remove event from origin list. Does not work on events with <fow_origin> or<fow_flying_origin> notetag. 
  *
  * cs_fow remove_all_origins
  * desc: Removes all origins, excluding player and events with <fow_origin> notetag.
@@ -229,13 +274,16 @@ CityShrimp.Fow = CityShrimp.Fow || {};
 // Load parameters
 CityShrimp.Fow.parameters = PluginManager.parameters("CityShrimp_Fow") || {};
 CityShrimp.Fow.enabled = (CityShrimp.Fow.parameters['Enabled'] === 'true') ? true : false;
-CityShrimp.Fow.fog_type = Number(CityShrimp.Fow.parameters['Fog Type'] || 1);
 CityShrimp.Fow.fog_opacity = Number(CityShrimp.Fow.parameters['Fog Opacity'] || 0.5);
 CityShrimp.Fow.map_hidden = (CityShrimp.Fow.parameters['Map Hidden'] === 'true') ? true : false;
 CityShrimp.Fow.strict_diagonals = (CityShrimp.Fow.parameters['Strict Diagonals'] === 'true') ? true : false;
 CityShrimp.Fow.player_vision = (CityShrimp.Fow.parameters['Player Vision'] === 'false') ? false : true;
-CityShrimp.Fow.player_range = Number(CityShrimp.Fow.parameters['Player Range'] || 3);
-CityShrimp.Fow.default_range = Number(CityShrimp.Fow.parameters['Default Range'] || 3);
+CityShrimp.Fow.player_range = Number(CityShrimp.Fow.parameters['Player Vision Range'] || 3);
+CityShrimp.Fow.player_type = Number(CityShrimp.Fow.parameters['Player Vision Type'] || 1);
+CityShrimp.Fow.player_flying = Number(CityShrimp.Fow.parameters['Player Flying Vision'] === 'true') ? true : false;
+CityShrimp.Fow.default_range = Number(CityShrimp.Fow.parameters['Origin Vision Range'] || 3);
+CityShrimp.Fow.vision_type = Number(CityShrimp.Fow.parameters['Origin Vision Type'] || 1);
+CityShrimp.Fow.flying_origins = (CityShrimp.Fow.parameters['Origin Flying Vision'] === 'true') ? true : false;
 CityShrimp.Fow._plain_region_id = Number(CityShrimp.Fow.parameters['Plain RegionId'] || 0);
 CityShrimp.Fow._forest_region_id = Number(CityShrimp.Fow.parameters['Forest RegionId'] || 1); 
 CityShrimp.Fow._hill_region_id = Number(CityShrimp.Fow.parameters['Hill RegionId'] || 2);
@@ -302,7 +350,9 @@ Game_Event.prototype.initialize = function(mapId, eventId) {
     
     // Declare parameters for origin events
     this.visible_set = new Set();
-    this.range = CityShrimp.Fow.default_range;
+    this.vision_range = CityShrimp.Fow.default_range;
+    this.vision_type = CityShrimp.Fow.vision_type;
+    this.flying_vision = false;
     this.floorX = this.x.floor();
     this.floorY = this.y.floor();
 };
@@ -334,7 +384,7 @@ Game_Event.prototype.updateFloor = function() {
 var old_Game_Player_initialize = Game_Player.prototype.initialize;
 Game_Player.prototype.initialize = function() {
     old_Game_Player_initialize.call(this);
-    this.range = CityShrimp.Fow.player_range;
+    this.vision_range = CityShrimp.Fow.player_range;
 };
 
 // Game_System prototype
@@ -345,8 +395,6 @@ Game_System.prototype.initialize = function() {
     
     // Save Fog of War parameters, so it is retained upon loading
     this.fow_enabled = CityShrimp.Fow.enabled;
-    this.fow_player_vision = CityShrimp.Fow.player_vision;
-    this.fow_player_range = CityShrimp.Fow.player_range;
     this.fow_origins = new Set();
     this.fow_targets = new Set();
     this.fow_discovered_map = new Map();
@@ -372,19 +420,21 @@ SceneManager.onSceneStart = function() {
     if (MVC.getProp($dataMap.meta, 'fow_enabled') != undefined)
         $gameSystem.fow_enabled = MVC.getProp($dataMap.meta, 'fow_enabled');
     if (MVC.getProp($dataMap.meta, 'fow_type') != undefined)
-        CityShrimp.Fow.fog_type = MVC.getProp($dataMap.meta, 'fow_type');
+        CityShrimp.Fow.vision_type = MVC.getProp($dataMap.meta, 'fow_type');
     if (MVC.getProp($dataMap.meta, 'fow_opacity') != undefined
        && MVC.getProp($dataMap.meta, 'fow_opacity') >= 0
        && MVC.getProp($dataMap.meta, 'fow_opacity') <= 1)
         CityShrimp.Fow.fog_opacity = MVC.getProp($dataMap.meta, 'fow_opacity');
     if (MVC.getProp($dataMap.meta, 'fow_strict_diagonals') != undefined)
-        $gameSystem.fow_strict_diagonals = MVC.getProp($dataMap.meta, 'fow_strict_diagonals');
+        CityShrimp.Fow.strict_diagonals = MVC.getProp($dataMap.meta, 'fow_strict_diagonals');
     if (MVC.getProp($dataMap.meta, 'fow_map_hidden') != undefined)
-        $gameSystem.fow_strict_diagonals = MVC.getProp($dataMap.meta, 'fow_map_hidden');
+        CityShrimp.Fow.map_hidden = MVC.getProp($dataMap.meta, 'fow_map_hidden');
     if (MVC.getProp($dataMap.meta, 'fow_player_vision') != undefined)
-        $gameSystem.fow_player_vision = MVC.getProp($dataMap.meta, 'fow_player_vision');
+        CityShrimp.Fow.player_vision = MVC.getProp($dataMap.meta, 'fow_player_vision');
     if (MVC.getProp($dataMap.meta, 'fow_player_range') && MVC.getProp($dataMap.meta, 'fow_player_range') >= 0)
-        $gameSystem.fow_player_range = MVC.getProp($dataMap.meta, 'fow_player_range');
+        CityShrimp.Fow.player_range = MVC.getProp($dataMap.meta, 'fow_player_range');
+    if (MVC.getProp($dataMap.meta, 'fow_flying_origins') != undefined)
+        CityShrimp.Fow.flying_origins = MVC.getProp($dataMap.meta, 'fow_flying_origins');
     
     // Initialize fog if enabled
     //if(this._scene instanceof Scene_Map && fow_enabled) {
@@ -420,6 +470,7 @@ CityShrimp.Fow.init = function() {
     // Check if tiles have already been generated previously
     if (! this._fog_tiles)
         this._fog_tiles = new Array($gameMap.sizeX);
+    
     this._sight_count = new Array($gameMap.sizeX);
     for (var i = 0; i < $gameMap.sizeX; i++) {
         this._fog_tiles[i] = new Array($gameMap.sizeY);
@@ -431,15 +482,32 @@ CityShrimp.Fow.init = function() {
     }
     
     // Add player to origins if enabled
-    if ($gameSystem.fow_player_vision) {
-        $gamePlayer.range = $gameSystem.fow_player_range;
+    if (CityShrimp.Fow.player_vision) {
+        $gamePlayer.vision_range = CityShrimp.Fow.player_range;
         $gameSystem.fow_origins.add($gamePlayer);
     }
         
     for (let e of $gameMap.events()) {
         // Add events with <fow_origin> tag and update it's range
-        if (MVC.getProp(e.meta, 'fow_origin') && MVC.getProp(e.meta, 'fow_origin') >= 0) {
-            e.range = MVC.getProp(e.meta, 'fow_origin');
+        if (MVC.getProp(e.meta, 'fow_origin')) {
+            if (Number.isInteger(MVC.getProp(e.meta, 'fow_origin_range')))
+                e.vision_range = MVC.getProp(e.meta, 'fow_origin_range');
+            else
+                e.vision_range = CityShrimp.Fow.default_range;
+            
+            if (Number.isInteger(MVC.getProp(e.meta, 'fow_origin_type')))
+                e.vision_type = MVC.getProp(e.meta, 'fow_origin_type');
+            else
+                e.vision_type = CityShrimp.Fow.default_range;
+            
+            if (MVC.getProp(e.meta, 'fow_origin_flying') == 'true')
+                e.vision_range = true;
+            else if (MVC.getProp(e.meta, 'fow_origin_flying') == 'false')
+                e.flying_vision = false;
+            else
+                e.flying_vision = CityShrimp.Fow.flying_vision;
+            
+            
             $gameSystem.fow_origins.add(e);
         }
         
@@ -467,6 +535,10 @@ CityShrimp.Fow.clear = function() {
             this._fog_tiles[i][j].visible = false;
         }
     }
+    
+    // Clear origin events' old visible set
+    for (let e of $gameSystem.fow_origins)
+        e.visible_set = new Set();
 }
 
 // Delete all fog sprites
@@ -493,7 +565,7 @@ CityShrimp.Fow.applyVision = function(e) {
     this._getVisibleSet(e, points, new_set);
     
     // For diamond shaped, need to check edge-1 points (for diagonals) for range >= 3
-    if (CityShrimp.Fow.fog_type == 1)
+    if (e.vision_type == 1)
         if (range >= 3) {
             points = this._getPoints(e, range - 1);
             this._getVisibleSet(e, points, new_set);   
@@ -516,6 +588,9 @@ CityShrimp.Fow.removeVision = function(e) {
             }
         }
     }
+    
+    // remove event's visible set afterwards
+    e.visible_set = new Set();
 }
 
 CityShrimp.Fow.isVisible = function(x, y) {
@@ -526,7 +601,7 @@ CityShrimp.Fow._getPoints = function(e, range) {
     var points = new Set();
     e.updateFloor();
     
-    switch(CityShrimp.Fow.fog_type) {
+    switch(e.vision_type) {
         case 1:        
             points.add([e.floorX, e.floorY + range]);
             points.add([e.floorX, e.floorY - range]);
@@ -615,48 +690,52 @@ CityShrimp.Fow._getVisibleSet = function(e, points, new_visible_set) {
             var floor_x = cur_x.floor();
             var floor_y = cur_y.floor();
             
-            // If Strict Diagonals is enabled, need to check left and right tiles if landed in between 4 tiles
-            var deltaX = cur_x - cur_x.floor();
-            var deltaY = cur_y - cur_y.floor();
-            if ($gameSystem.fow_strict_diagonals) {
-                if (deltaX <= 0.01 && deltaY <= 0.01) {
-                    // !!! Need to implement check left and right
-                    if ((step_x > 0 && step_y > 0) || (step_x < 0 && step_y < 0)) {
-                        var left_region_id = $gameMap.regionId(floor_x - 1, floor_y);
-                        var right_region_id = $gameMap.regionId(floor_x, floor_y - 1);
-                    } else {
-                        var left_region_id = $gameMap.regionId(floor_x - 1, floor_y - 1);
-                        var right_region_id = $gameMap.regionId(floor_x, floor_y);
+            // Only need to check if unit isn't flying
+            if (! e.flying_vision) {
+            
+                // If Strict Diagonals is enabled, need to check left and right tiles if landed in between 4 tiles
+                var deltaX = cur_x - cur_x.floor();
+                var deltaY = cur_y - cur_y.floor();
+                if (CityShrimp.Fow.strict_diagonals) {
+                    if (deltaX <= 0.01 && deltaY <= 0.01) {
+                        // !!! Need to implement check left and right
+                        if ((step_x > 0 && step_y > 0) || (step_x < 0 && step_y < 0)) {
+                            var left_region_id = $gameMap.regionId(floor_x - 1, floor_y);
+                            var right_region_id = $gameMap.regionId(floor_x, floor_y - 1);
+                        } else {
+                            var left_region_id = $gameMap.regionId(floor_x - 1, floor_y - 1);
+                            var right_region_id = $gameMap.regionId(floor_x, floor_y);
+                        }
+
+                        // Unit have limited visibility
+                        if (origin_height == 0)
+                        {   
+                            if (left_region_id == CityShrimp.Fow._hill_region_id ||
+                                left_region_id == CityShrimp.Fow._forest_region_id ||
+                                left_region_id == CityShrimp.Fow._mountain_region_id) {
+                                left_blocked = true;
+                            }
+                            if (right_region_id == CityShrimp.Fow._hill_region_id ||
+                                right_region_id == CityShrimp.Fow._forest_region_id ||
+                                right_region_id == CityShrimp.Fow._mountain_region_id) {
+                                right_blocked = true;
+                            }
+                        }
+                        // Unit have high visibility (can see through everythign except mountain)
+                        else
+                        {
+                            if (left_region_id == CityShrimp.Fow._mountain_region_id) {
+                                left_blocked = true;
+                            }
+                            if (right_region_id == CityShrimp.Fow._mountain_region_id) {
+                                right_blocked = true;
+                            }
+                        }   
+
+                        // Blocked if both left and right are blocked
+                        if (left_blocked && right_blocked)
+                            break;
                     }
-                                
-                    // Unit have limited visibility
-                    if (origin_height == 0)
-                    {   
-                        if (left_region_id == CityShrimp.Fow._hill_region_id ||
-                            left_region_id == CityShrimp.Fow._forest_region_id ||
-                            left_region_id == CityShrimp.Fow._mountain_region_id) {
-                            left_blocked = true;
-                        }
-                        if (right_region_id == CityShrimp.Fow._hill_region_id ||
-                            right_region_id == CityShrimp.Fow._forest_region_id ||
-                            right_region_id == CityShrimp.Fow._mountain_region_id) {
-                            right_blocked = true;
-                        }
-                    }
-                    // Unit have high visibility (can see through everythign except mountain)
-                    else
-                    {
-                        if (left_region_id == CityShrimp.Fow._mountain_region_id) {
-                            left_blocked = true;
-                        }
-                        if (right_region_id == CityShrimp.Fow._mountain_region_id) {
-                            right_blocked = true;
-                        }
-                    }   
-                    
-                    // Blocked if both left and right are blocked
-                    if (left_blocked && right_blocked)
-                        break;
                 }
             }
             
@@ -667,24 +746,27 @@ CityShrimp.Fow._getVisibleSet = function(e, points, new_visible_set) {
             
             new_visible_set.add(this._fog_tiles[floor_x][floor_y]);
             
-            var point_region_id = $gameMap.regionId(floor_x, floor_y);
+            // Only need to check if unit isn't flying
+            if (! e.flying_vision) {
+                var point_region_id = $gameMap.regionId(floor_x, floor_y);
 
-            // Unit have limited visibility
-            if (origin_height == 0)
-            {
-                if (point_region_id == CityShrimp.Fow._hill_region_id ||
-                    point_region_id == CityShrimp.Fow._forest_region_id ||
-                    point_region_id == CityShrimp.Fow._mountain_region_id) {
-                    break;
+                // Unit have limited visibility
+                if (origin_height == 0)
+                {
+                    if (point_region_id == CityShrimp.Fow._hill_region_id ||
+                        point_region_id == CityShrimp.Fow._forest_region_id ||
+                        point_region_id == CityShrimp.Fow._mountain_region_id) {
+                        break;
+                    }
                 }
+                // Unit have high visibility (can see through everythign except mountain)
+                else
+                {
+                    if (point_region_id == CityShrimp.Fow._mountain_region_id) {
+                        break;
+                    }
+                }   
             }
-            // Unit have high visibility (can see through everythign except mountain)
-            else
-            {
-                if (point_region_id == CityShrimp.Fow._mountain_region_id) {
-                    break;
-                }
-            }   
         }
     }
 }
@@ -746,9 +828,9 @@ CityShrimp.Fow._getHeight = function(e) {
 CityShrimp.Fow._getRange = function(e) {
     // Unit on a hill
     if (this._inRegion(e, this._watchtower_region_id))
-        return e.range + this._watchtower_modifier;
+        return e.vision_range + this._watchtower_modifier;
     else
-        return e.range;
+        return e.vision_range;
 }
 
 // Check if the event is in specified region
@@ -780,16 +862,16 @@ Game_Interpreter.prototype.pluginCommand = function(command, args) {
                 }
                 break;
             case 'enable_player':
-                if (! $gameSystem.fow_player_vision) { 
-                    $gameSystem.fow_player_vision = true;
+                if (! CityShrimp.Fow.player_vision) { 
+                    CityShrimp.Fow.player_vision = true;
                     $gameSystem.fow_origins.add($gamePlayer);
                     if ($gameSystem.fow_enabled)
                         CityShrimp.Fow.applyVision($gamePlayer);
                 }
                 break;
             case 'disable_player':
-                if ($gameSystem.fow_player_vision) {
-                    $gameSystem.fow_player_vision = false;
+                if (CityShrimp.Fow.player_vision) {
+                    CityShrimp.Fow.player_vision = false;
                     $gameSystem.fow_origins.delete($gamePlayer);
                     if ($gameSystem.fow_enabled)
                         CityShrimp.Fow.removeVision($gamePlayer);
@@ -797,15 +879,52 @@ Game_Interpreter.prototype.pluginCommand = function(command, args) {
                 break;
             case 'set_player_range':
                 if (args[1] && args[1] >= 0) {
-                    $gamePlayer.range = args[1];
-                    $gameSystem.fow_player_range = args[1];
-                    if ($gameSystem.fow_enabled && $gameSystem.fow_player_vision)
+                    $gamePlayer.vision_range = args[1];
+                    CityShrimp.Fow.player_range = args[1];
+                    if ($gameSystem.fow_enabled && CityShrimp.Fow.player_vision)
                         CityShrimp.Fow.applyVision($gamePlayer);
+                }
+                break;
+            case 'set_player_type':
+                if (Number.isInteger(args[1])) {
+                    $gamePlayer.vision_type = args[1];
+                    CityShrimp.Fow.player_type = args[1];
+                    if ($gameSystem.fow_enabled && CityShrimp.Fow.player_vision)
+                        CityShrimp.Fow.applyVision($gamePlayer);                    
+                }
+                break;
+            case 'set_player_flying':
+                if (typeof args[1] === 'boolean') {
+                    $gamePlayer.flying_vision = args[1];
+                    CityShrimp.Fow.player_flying = args[1];
+                    if ($gameSystem.fow_enabled && CityShrimp.Fow.player_vision)
+                        CityShrimp.Fow.applyVision($gamePlayer);                    
                 }
                 break;
             case 'add_origin':
                 if (Number.isInteger(args[1])) {
                     $gameSystem.fow_origins.add($gameMap.event(args[1]));
+                    if ($gameSystem.fow_enabled)
+                        CityShrimp.Fow.applyVision($gameMap.event(args[1]));                    
+                }
+                break;
+            case 'set_origin_range':
+                if (Number.isInteger(args[1]) && Number.isInteger(args[2])) {
+                    $gameMap.event(args[1]).vision_range = args[2];
+                    if ($gameSystem.fow_enabled)
+                        CityShrimp.Fow.applyVision($gameMap.event(args[1]));                    
+                }
+                break;
+            case 'set_origin_type':
+                if (Number.isInteger(args[1]) && Number.isInteger(args[2])) {
+                    $gameMap.event(args[1]).vision_type = args[2];
+                    if ($gameSystem.fow_enabled)
+                        CityShrimp.Fow.applyVision($gameMap.event(args[1]));                    
+                }
+                break;
+            case 'set_origin_flying':
+                if (Number.isInteger(args[1]) && (typeof args[2] === 'boolean')) {
+                    $gameMap.event(args[1]).flying_vision = args[2];
                     if ($gameSystem.fow_enabled)
                         CityShrimp.Fow.applyVision($gameMap.event(args[1]));                    
                 }
@@ -820,9 +939,6 @@ Game_Interpreter.prototype.pluginCommand = function(command, args) {
                         }
                 break;
             case 'remove_all_origins':
-                if ($gameSystem.fow_player_vision) {
-                    $gameSystem.fow_origins.add($gamePlayer);
-                }
                 for (let e of $gameSystem.fow_origins) 
                     if ((! MVC.getProp(e.meta, 'fow_origin')) && (e != $gamePlayer)) {
                         $gameSystem.fow_origins.delete(e);
