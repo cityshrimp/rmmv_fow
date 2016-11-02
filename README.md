@@ -23,8 +23,5 @@ Instructions
 To-do List
 ===========
 1. Map discovery (save set of points, not array of entire map)
-2. Flying origin (no obstruction in view)
-3. Circle shape vision
-4. Each origin has their own vision type
-5. Add origin with default range and vision type
-6. Map option - Gradient vision.  Idea is to have an map in each sprite (extend it so it won't be in all sprites) that stores event-opacity pairs.  Each new origin that lights up the tile will add a new pair, then opacity is calculated and applied.  When an origin leaves, remove the pair and apply.  When an origin moves, it will override the pair and apply.  Replace sight count with this new method 
+2. Circle shape vision
+3. Map option - Gradient vision.  Idea is to have an map in each sprite (extend it so it won't be in all sprites) that stores event-opacity pairs.  Each new origin that lights up the tile will add a new pair, then opacity is calculated and applied.  When an origin leaves, remove the pair and apply.  When an origin moves, it will override the pair and apply.  Replace sight count with this new method 
