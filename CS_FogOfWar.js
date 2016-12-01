@@ -1,7 +1,7 @@
 /*=============================================================================
  * CityShrimp's Fog of War System
  * CS_FogOfWar.js
- * Version: 1.0.1
+ * Version: 1.0.1a
  * Free for commercial and non commercial use.
  *=============================================================================*/
 
@@ -227,7 +227,7 @@
 */
 
 var Imported = Imported || {};
-Imported['CS_FogOfWar'] = "1.0.1";
+Imported['CS_FogOfWar'] = "1.0.1a";
 
 var CS_FogOfWar = CS_FogOfWar || {};
 
@@ -1052,35 +1052,6 @@ if (Imported['MVCommons'] === undefined) {
         old_Game_Event_initialize.call(this, mapId, eventId);
         
         var data_e = $dataMap.events[eventId];
-        
-        // Declare parameters for origin events
-        this.end_points = new Array();
-        var range = parseInt(MVC.getProp(data_e.meta, 'fow_origin_range'));
-        if (Number.isInteger(range))
-            this.vision_range = range;
-        else {
-            this.vision_range = $gameSystem.fow_default_range;
-        }
-        this.old_range = this.vision_range;
-        var type = parseInt(MVC.getProp(data_e.meta, 'fow_origin_type'));
-        if (Number.isInteger(type))
-            this.vision_type = type;
-        else
-            this.vision_type = $gameSystem.fow_vision_type;
-        var flying = MVC.getProp(data_e.meta, 'fow_origin_flying');
-        if (flying != undefined)
-            if (flying.trim() == 'true')
-                this.flying_vision = true;
-            else if (flying.trim() == 'false')
-                this.flying_vision = false;
-            else
-                this.flying_vision = $gameSystem.fow_flying_origins;
-        var brightness = parseFloat(MVC.getProp(data_e.meta, 'fow_origin_brightness'));
-        if (!Number.isNaN(brightness))
-            this.vision_brightness = brightness;
-        else
-            this.vision_brightness = $gameSystem.fow_vision_brightness;
-
         this.is_origin = (MVC.getProp(data_e.meta, 'fow_origin')) ? true : false;
         this.is_target = (MVC.getProp(data_e.meta, 'fow_target')) ? true : false;
     }
@@ -1135,7 +1106,7 @@ if (Imported['MVCommons'] === undefined) {
 
     // ===Alias Scene_Map===
     var old_Scene_Map_initialize = Scene_Map.prototype.initialize;
-    Scene_Map.prototype.initialize = function() { 
+    Scene_Map.prototype.initialize = function() {
         old_Scene_Map_initialize.call(this);
         this.oldX = $gameMap.displayX();
         this.oldY = $gameMap.displayY();
@@ -1148,7 +1119,7 @@ if (Imported['MVCommons'] === undefined) {
         if ($gameSystem.last_map != $gameMap.mapId()) {
             // Load defaults
             $gameSystem.loadFowDefaults();
-
+            
             // Update $gameSystem variables based on tags for this map
             if (MVC.getProp($dataMap.meta, 'fow_enabled') != undefined)
                 $gameSystem.fow_enabled = MVC.getProp($dataMap.meta, 'fow_enabled');
@@ -1194,10 +1165,35 @@ if (Imported['MVCommons'] === undefined) {
             $.visible_sets[0] = new CS_Set();
             for (let e of $gameMap.events()) {
                 $.visible_sets[e.eventId()] = new CS_Set(); 
-                e.vision_range = $gameSystem.fow_default_range;
-                e.vision_type = $gameSystem.fow_vision_type;
-                e.flying_vision = $gameSystem.fow_flying_origins;
-                e.vision_brightness = $gameSystem.fow_vision_brightness;
+
+                // Declare parameters for origin events
+                var data_e = $dataMap.events[e.eventId()];
+                e.end_points = new Array();
+                var range = parseInt(MVC.getProp(data_e.meta, 'fow_origin_range'));
+                if (Number.isInteger(range))
+                    e.vision_range = range;
+                else {
+                    e.vision_range = $gameSystem.fow_default_range;
+                }
+                this.old_range = this.vision_range;
+                var type = parseInt(MVC.getProp(data_e.meta, 'fow_origin_type'));
+                if (Number.isInteger(type))
+                    e.vision_type = type;
+                else
+                    e.vision_type = $gameSystem.fow_vision_type;
+                var flying = MVC.getProp(data_e.meta, 'fow_origin_flying');
+                if (flying != undefined)
+                    if (flying.trim() == 'true')
+                        e.flying_vision = true;
+                    else if (flying.trim() == 'false')
+                        e.flying_vision = false;
+                    else
+                        e.flying_vision = $gameSystem.fow_flying_origins;
+                var brightness = parseFloat(MVC.getProp(data_e.meta, 'fow_origin_brightness'));
+                if (!Number.isNaN(brightness))
+                    e.vision_brightness = brightness;
+                else
+                    e.vision_brightness = $gameSystem.fow_vision_brightness;
                 
                 if (e.is_origin)
                     e.calculateEndPoints();
