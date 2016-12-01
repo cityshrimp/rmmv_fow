@@ -82,3 +82,4 @@ Notes and Limitations
 - Directional vision should work with most 8-direction movement plugins.
 - Targets may not show/hide correctly if they are bigger than 1 tile
 - Performance may become an issue if 1) map is too large, 2) too many origins, or 3) vision is too large
+- Never tested with Vehicles
