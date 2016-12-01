@@ -284,8 +284,6 @@ if (Imported['MVCommons'] === undefined) {
     
     // Create fog sprites and sight count map
     $.init = function() {  
-        console.log("$.init");
-        
         for (var i = 0; i < $dataMap.width; i++) {
             for (var j = 0; j < $dataMap.height; j++) {
                 this._fog_tiles[i][j].visible = true;
@@ -294,7 +292,6 @@ if (Imported['MVCommons'] === undefined) {
                 this._fog_tiles[i][j].y = (j - $gameMap.displayY())*48;
             }
         }
-        //}
 
         // Map has "Map Hidden" enabled, need to save a copy of discovered tiles
         if ($gameSystem.fow_map_hidden) {
@@ -700,7 +697,6 @@ if (Imported['MVCommons'] === undefined) {
                 s.addGradient(origin.eventId(), gradient);
             } else {
                 // No gradient, then add enough light to reveal entire tile
-                console.log(origin.vision_brightness);
                 s.addGradient(origin.eventId(), $gameSystem.fow_fog_opacity * origin.vision_brightness);
             }
             
@@ -930,7 +926,6 @@ if (Imported['MVCommons'] === undefined) {
                 $._fog_tiles[i][j] = sprite;
                 sprite.bitmap = $.bitmap;
                 this.addChild(sprite);
-                //sprite.addGradient(-1, 1 - $.fog_opacity);
                 sprite.x = i*48;
                 sprite.y = j*48;
             }
@@ -943,8 +938,6 @@ if (Imported['MVCommons'] === undefined) {
     // ===Alias Game_CharacterBase===
     var old_Game_CharacterBase_initialize = Game_CharacterBase.prototype.initialize;
     Game_CharacterBase.prototype.initialize = function() {
-        console.log("create characterbase");
-        
         old_Game_CharacterBase_initialize.call(this);
         
         this.floorX = this._x.floor();
@@ -1143,8 +1136,6 @@ if (Imported['MVCommons'] === undefined) {
     // ===Alias Scene_Map===
     var old_Scene_Map_initialize = Scene_Map.prototype.initialize;
     Scene_Map.prototype.initialize = function() { 
-        console.log("init map");
-        
         old_Scene_Map_initialize.call(this);
         this.oldX = $gameMap.displayX();
         this.oldY = $gameMap.displayY();
@@ -1152,13 +1143,9 @@ if (Imported['MVCommons'] === undefined) {
     
     var old_Scene_Map_start = Scene_Map.prototype.start;
     Scene_Map.prototype.start = function() {    
-        console.log("start map");
-        
         old_Scene_Map_start.call(this);
 
         if ($gameSystem.last_map != $gameMap.mapId()) {
-            console.log("new map");
-            
             // Load defaults
             $gameSystem.loadFowDefaults();
 
@@ -1244,12 +1231,10 @@ if (Imported['MVCommons'] === undefined) {
             var tileY = this.oldY.floor();
             
             if (this.oldX != realX || this.oldY != realY) {
-                for (var i = (tileX - 1); i < (tileX + 18); i++)
-                    for (var j = (tileY - 1); j < (tileY + 14); j++) {
-                        if (i >= 0 && i < $dataMap.width && j >= 0 && j < $dataMap.height) {
-                            $._fog_tiles[i][j].x = (i - realX)*48;
-                            $._fog_tiles[i][j].y = (j - realY)*48;
-                        }
+                for (var i = 0; i < $dataMap.width; i++)
+                    for (var j = 0; j < $dataMap.height; j++) {
+                        $._fog_tiles[i][j].x = (i - realX)*48;
+                        $._fog_tiles[i][j].y = (j - realY)*48;
                     }
             } else if ($.first_update) {
                 $.first_update = false;
