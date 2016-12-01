@@ -227,7 +227,7 @@
 */
 
 var Imported = Imported || {};
-Imported['CS_FogOfWar'] = "1.0.0";
+Imported['CS_FogOfWar'] = "1.0.1";
 
 var CS_FogOfWar = CS_FogOfWar || {};
 
