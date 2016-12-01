@@ -1,7 +1,7 @@
 /*=============================================================================
  * CityShrimp's Fog of War System
  * CS_FogOfWar.js
- * Version: 1.0.0
+ * Version: 1.0.1
  * Free for commercial and non commercial use.
  *=============================================================================*/
 
