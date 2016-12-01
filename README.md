@@ -29,6 +29,51 @@ Instructions
 - Place it into your project's Plugin list
 - Check description in file for latest Parameter, Notetag, and Plugin Commands
 
+Demo
+====
+YouTube: https://youtu.be/VX62Lba6XM0
+
+Demo 1 - Strategy View (e.g Advanced Wars):
+  - Player Vision: enabled
+  - Strict Diagonals: disabled
+  - Map Hidden: disabled
+  - Gradient Vision: disabled
+  - Fog Opacity: 0.75
+  - Fade Speed: 0.1
+  
+Demo 2 - Inside a building
+  - Player Vision: disabled
+  - Strict Diagonals: enabled
+  - Map Hidden: disabled
+  - Gradient Vision: enabled
+  - Fog Opacity: 0.75
+  - Fade Speed: 0.1
+  - Lights are on a loop to increase and decrease brightness
+  
+Demo 3 - Dungeon Crawling
+  - Player Vision: enabled
+  - Strict Diagonals: enabled
+  - Map Hidden: enabled
+  - Gradient Vision: enabled
+  - Fog Opacity: 1
+  - Fade Speed: 0.1
+  
+Demo 4 - RTS (e.g. Starcraft)
+  - Player Vision: enabled
+  - Strict Diagonals: disabled
+  - Map Hidden: enabled
+  - Gradient Vision: disabled
+  - Fog Opacity: 0.75
+  - Fade Speed: 0.1
+  
+Demo 5 - Performance Test
+  - Player Vision: enabled
+  - Strict Diagonals: disabled
+  - Map Hidden: disabled
+  - Gradient Vision: enabled
+  - Fog Opacity: 0.75
+  - Fade Speed: 0.1
+
 Notes and Limitations
 =====================
 - Does not work with loop maps.
