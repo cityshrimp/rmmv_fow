@@ -1235,7 +1235,7 @@ if (Imported['MVCommons'] === undefined) {
             } else if ($.first_update) {
                 $.first_update = false;
                 for (var i = 0; i < $dataMap.width; i++)
-                    for (var j = 0; j < $dataMap.length; j++) {
+                    for (var j = 0; j < $dataMap.height; j++) {
                         $._fog_tiles[i][j].x = (i - realX)*48;
                         $._fog_tiles[i][j].y = (j - realY)*48;
                     }
