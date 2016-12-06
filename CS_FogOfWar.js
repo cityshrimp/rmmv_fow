@@ -1,7 +1,7 @@
 /*=============================================================================
  * CityShrimp's Fog of War System
  * CS_FogOfWar.js
- * Version: 1.0.1a
+ * Version: 1.0.2
  * Free for commercial and non commercial use.
  *=============================================================================*/
 
@@ -9,15 +9,6 @@
  * @plugindesc This plugin provides a complete fog of war system.
  *             
  * @author CityShrimp
- * @help
- * ============================================================================
- * Latest Version
- * ============================================================================
- * 
- * Get the latest version of this script on 
- * https://github.com/cityshrimp/rmmv_fow/blob/master/CS_FogOfWar.js
- * 
- *=============================================================================
  *
  * ===Parameter List===
  *
@@ -136,7 +127,7 @@
  * desc: Origins will have unobstructed vision.
  *
  * <fow_origin_brightness: (value)>
- * desc: Origin events' vision brigthness for this map
+ * desc: Origin events' vision brigthness for this map.  (value): between 0 to 1
  *
  * <fow_player_vision>
  * desc: Player has vision for this map
@@ -153,19 +144,23 @@
  * <fow_player_brightness: (value)>
  * desc: Player's vision brigthness for this map
  *
- * ===Event Notetag===
+ * ===Event Notetag / Comment===
+ * Note: Comments have precedence over Notetags.
  *
  * <fow_origin>
  * desc: Event will be able to reveal fog. (range) is the vision range of the event.
  *
- * <fow_origin_range: (range)>
+ * <fow_origin_range: (integer)>
  * desc: Set the origin event's vision range.
  *
- * <fow_origin_type: (type)>
+ * <fow_origin_type: (integer)>
  * desc: Set the origin event's vision type.
  *
  * <fow_origin_flying: (bool)>
  * desc: Set the origin's flying (unobstructed vision) attribute
+ *
+ * <fow_origin_brightness: (value)>
+ * desc: Set the origin event's brightness.  (value): between 0 to 1
  *
  * <fow_target>
  * desc: Event will be hidden unless on a revealed tile.
@@ -196,14 +191,17 @@
  * cs_fow add_origin <event id>
  * desc: Event will be able to reveal fog.  Does not persist if map changes.
  *
- * cs_fow set_origin_range <event id> <range>
+ * cs_fow set_origin_range <event id> <integer>
  * desc: Set the origin's vision range.  Does not persist if map changes.
  *
- * cs_fow set_origin_type <event id> <type>
+ * cs_fow set_origin_type <event id> <integer>
  * desc: Set the origin's vision type.  Does not persist if map changes.
  *
  * cs_fow set_origin_flying <event id> <bool>
  * desc: Set the origin's flying (unobstructed vision) attribute.  Does not persist if map changes.
+ *
+ * cs_fow set_origin_brightness <event id> <value>
+ * desc: Set the origin's brightness, value: between 0 to 1.  Does not persist if map changes.
  *
  * cs_fow remove_origin <event id>
  * desc: Remove event from origin list. Does not work on events with <fow_origin> notetag.  Does not persist if map changes. 
@@ -224,10 +222,20 @@
  * - Does not work with maps with loop
  * - Targets may not show/hide correctly if they are bigger than 1 tile
  * - Performance may become an issue if 1) map is too large, 2) too many origins, 3) heavy use of circle or directinoal vision type, or 4) origin vision is too large
+ *
+ * @help
+ * ============================================================================
+ * Latest Version
+ * ============================================================================
+ * 
+ * Get the latest version of this script on 
+ * https://github.com/cityshrimp/rmmv_fow/blob/master/CS_FogOfWar.js
+ * 
+ *=============================================================================
 */
 
 var Imported = Imported || {};
-Imported['CS_FogOfWar'] = "1.0.1a";
+Imported['CS_FogOfWar'] = "1.0.2";
 
 var CS_FogOfWar = CS_FogOfWar || {};
 
@@ -236,7 +244,18 @@ if (Imported['MVCommons'] === undefined) {
   var MVC = MVC || {};
 
   (function($) {
-    $.getProp = function(meta, propName) {if (meta === undefined) return undefined;if (meta[propName] !== undefined) return meta[propName];for (var key in meta) {if (key.toLowerCase() == propName.toLowerCase()) {return meta[key].trim();}}return undefined;};
+    $.getProp = function(meta, propName) {
+        if (meta === undefined)
+            return undefined;
+        if (meta[propName] !== undefined)
+            return meta[propName];
+        for (var key in meta) {
+            if (key.toLowerCase() == propName.toLowerCase()) {
+                return meta[key].trim();
+            }
+        }
+        return undefined;
+    };
   })(MVC);
 
   Number.prototype.fix = function() {return (parseFloat(this.toPrecision(12)));};
@@ -955,26 +974,31 @@ if (Imported['MVCommons'] === undefined) {
 
         this.updateFloor();
         // Apply vision after move if fog is enabled and event is an origin
-        if ($gameSystem.fow_enabled)
+        if ($gameSystem.fow_enabled) {
             // Only make an update if there's a change in position or direction.  To speed up performance
-            if (this.is_origin
-                && (this.floorX != this.oldFloorX
+            if (this.floorX != this.oldFloorX
                 || this.floorY != this.oldFloorY
                 || this.direction() != this.oldDirection
-                || $.first_update)) {
-                // Remove vision if event is moved outside of map
-                if (this.x >= $dataMap.width || this.x < 0
-                   || this.y >= $dataMap.height || this.y < 0)
-                    $.removeVision(this);
-                else    
-                    $.applyVision(this);
-
+                || $.first_update) {
+                if (this.is_origin) {
+                    // Remove vision if event is moved outside of map
+                    if (this.x >= $dataMap.width || this.x < 0
+                       || this.y >= $dataMap.height || this.y < 0)
+                        $.removeVision(this);
+                    else    
+                        $.applyVision(this);
+                }
+                
+                if (this.is_target)
+                    this.setTransparent(($._fog_tiles[this.floorX][this.floorY].gradient_map.size < 2));
+                
                 this.oldX = this._x;
                 this.oldY = this._y;
                 this.oldFloorX = this.floorX;
                 this.oldFloorY = this.floorY;
                 this.oldDirection = this.direction();
             }
+        }
     };
 
     Game_CharacterBase.prototype.updateFloor = function() {    
@@ -1053,7 +1077,33 @@ if (Imported['MVCommons'] === undefined) {
         
         var data_e = $dataMap.events[eventId];
         this.is_origin = (MVC.getProp(data_e.meta, 'fow_origin')) ? true : false;
+        this.is_origin = this.searchComment('fow_origin') ? true : this.is_origin;
         this.is_target = (MVC.getProp(data_e.meta, 'fow_target')) ? true : false;
+        this.is_target = this.searchComment('fow_target') ? true : this.is_target;
+    }
+        
+    Game_Event.prototype.searchComment = function(term) {
+        var comment = "";
+        if(!this.page())
+            return value;
+        var pagelist = this.page().list;
+        for (var cmd of pagelist) {
+            if(cmd.code == 108)   comment += cmd.parameters[0] + "\n";
+            if(cmd.code == 408)   comment += cmd.parameters[0] + "\n";
+        }
+        var temp = comment.split("<" + term);
+        if (temp.length > 1) {
+            temp = temp[1].split(">")[0];
+            if (temp.includes(":")) {
+                return temp.split(":")[1].trim();
+            } else {
+                return true;
+            }
+        } else {
+            return false;
+        }
+
+        return false;
     }
 
     // ===Alias Game_Player===
@@ -1163,24 +1213,21 @@ if (Imported['MVCommons'] === undefined) {
                 $gamePlayer.is_origin = false;
             }
             $.visible_sets[0] = new CS_Set();
-            for (let e of $gameMap.events()) {
+            for (let e of $gameMap.events()) {        
                 $.visible_sets[e.eventId()] = new CS_Set(); 
 
                 // Declare parameters for origin events
                 var data_e = $dataMap.events[e.eventId()];
                 e.end_points = new Array();
                 var range = parseInt(MVC.getProp(data_e.meta, 'fow_origin_range'));
-                if (Number.isInteger(range))
-                    e.vision_range = range;
-                else {
-                    e.vision_range = $gameSystem.fow_default_range;
-                }
+                e.vision_range = (Number.isInteger(range)) ? range : $gameSystem.fow_default_range;
+                range = parseInt(e.searchComment('fow_origin_range'));
+                e.vision_range = (Number.isInteger(range)) ? range : e.vision_range;
                 this.old_range = this.vision_range;
                 var type = parseInt(MVC.getProp(data_e.meta, 'fow_origin_type'));
-                if (Number.isInteger(type))
-                    e.vision_type = type;
-                else
-                    e.vision_type = $gameSystem.fow_vision_type;
+                e.vision_type = (Number.isInteger(type)) ? type : $gameSystem.fow_vision_type;
+                type = parseInt(e.searchComment('fow_origin_type'));
+                e.vision_type = (Number.isInteger(type)) ? type : e.vision_type;
                 var flying = MVC.getProp(data_e.meta, 'fow_origin_flying');
                 if (flying != undefined)
                     if (flying.trim() == 'true')
@@ -1189,11 +1236,11 @@ if (Imported['MVCommons'] === undefined) {
                         e.flying_vision = false;
                     else
                         e.flying_vision = $gameSystem.fow_flying_origins;
+                e.flying_vision = (e.searchComment('fow_origin_flying')) ? true : e.flying_vision;
                 var brightness = parseFloat(MVC.getProp(data_e.meta, 'fow_origin_brightness'));
-                if (!Number.isNaN(brightness))
-                    e.vision_brightness = brightness;
-                else
-                    e.vision_brightness = $gameSystem.fow_vision_brightness;
+                e.vision_brightness = (!Number.isNaN(brightness)) ? brightness : $gameSystem.fow_vision_brightness;
+                brightness = parseFloat(e.searchComment('fow_origin_brightness'));
+                e.vision_brightness = (!Number.isNaN(brightness)) ? brightness : e.vision_brightness;
                 
                 if (e.is_origin)
                     e.calculateEndPoints();
@@ -1235,7 +1282,7 @@ if (Imported['MVCommons'] === undefined) {
             } else if ($.first_update) {
                 $.first_update = false;
                 for (var i = 0; i < $dataMap.width; i++)
-                    for (var j = 0; j < $dataMap.height; j++) {
+                    for (var j = 0; j < $dataMap.length; j++) {
                         $._fog_tiles[i][j].x = (i - realX)*48;
                         $._fog_tiles[i][j].y = (j - realY)*48;
                     }
@@ -1249,15 +1296,6 @@ if (Imported['MVCommons'] === undefined) {
     }
 
     // ===End Alias Scene_Map===
-    
-    /*
-    // ===Alias DataManager===
-    var old_Scene_Load_onLoadSuccess = Scene_Load.prototype.onLoadSuccess;
-    Scene_Load.prototype.onLoadSuccess = function() {
-        old_Scene_Load_onLoadSuccess.call(this);
-    };
-    // ===End Alias DataManager===
-    */
 
     // ===Game Interpreter prototype===
     var old_Game_Interpreter_pluginCommand = Game_Interpreter.prototype.pluginCommand;
