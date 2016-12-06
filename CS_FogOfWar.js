@@ -1,7 +1,7 @@
 /*=============================================================================
  * CityShrimp's Fog of War System
  * CS_FogOfWar.js
- * Version: 1.0.2
+ * Version: 1.0.2a
  * Free for commercial and non commercial use.
  *=============================================================================*/
 
@@ -235,7 +235,7 @@
 */
 
 var Imported = Imported || {};
-Imported['CS_FogOfWar'] = "1.0.2";
+Imported['CS_FogOfWar'] = "1.0.2a";
 
 var CS_FogOfWar = CS_FogOfWar || {};
 
@@ -405,23 +405,25 @@ if (Imported['MVCommons'] === undefined) {
     }
 
     $.removeVision = function(e) {
-        for (let s of $.visible_sets[e.eventId()].items()) {
-            s.removeGradient(e.eventId());
+        if ($.visible_sets[e.eventId()] != undefined) {
+            for (let s of $.visible_sets[e.eventId()].items()) {
+                s.removeGradient(e.eventId());
 
-            if (s.gradient_map.size < 2) {
-                // Hide target events on this square
-                for (let target of $.getTargets()) {
-                    if (target != null && target != undefined) {
-                        if (target.floorX == s.mapX && target.floorY == s.mapY) {
-                            target._transparent = true;
+                if (s.gradient_map.size < 2) {
+                    // Hide target events on this square
+                    for (let target of $.getTargets()) {
+                        if (target != null && target != undefined) {
+                            if (target.floorX == s.mapX && target.floorY == s.mapY) {
+                                target._transparent = true;
+                            }
                         }
                     }
                 }
             }
-        }
 
-        // remove event's visible set afterwards
-        $.visible_sets[e.eventId()] = new CS_Set();
+            // remove event's visible set afterwards
+            $.visible_sets[e.eventId()] = new CS_Set();
+        }
     }
 
     $.tileVisible = function(event) {
@@ -733,11 +735,7 @@ if (Imported['MVCommons'] === undefined) {
         // Show/Hide targets based on new visibility
         for (let target of $.getTargets()) {
             if (target != null && target != undefined) {
-                if (this._fog_tiles[target.floorX][target.floorY].gradient_map.size >= 2) {                    
-                    $gameMap.event(target.eventId())._transparent = false;
-                } else {
-                    $gameMap.event(target.eventId())._transparent = true;
-                }
+                $gameMap.event(target.eventId()).setTransparent(!$.tileVisible(target));
             }
         }
 
@@ -771,17 +769,11 @@ if (Imported['MVCommons'] === undefined) {
     }
     
     $.addOrigin = function(e) {
-        if (!e.is_origin) {
-            e.calculateEndPoints();
-            if ($gameSystem.fow_enabled)
-                $.applyVision(e);
-            
-            e.is_origin = true;
-            return true;
-        }
-        
         e.is_origin = true;
-        return false;
+        e.updateFloor();
+        e.calculateEndPoints();
+        if ($gameSystem.fow_enabled)
+            $.applyVision(e);
     };
     
     $.getOrigins = function() {
@@ -794,6 +786,14 @@ if (Imported['MVCommons'] === undefined) {
         }
         
         return origins;
+    }
+    
+    $.addTarget = function(e) {
+        e.is_target = true;
+        e.updateFloor();
+        if ($gameSystem.for_enabled) {
+            e.setTransparent(!$.tileVisible(e));
+        }
     }
     
     $.getTargets = function() {
@@ -979,7 +979,11 @@ if (Imported['MVCommons'] === undefined) {
             if (this.floorX != this.oldFloorX
                 || this.floorY != this.oldFloorY
                 || this.direction() != this.oldDirection
-                || $.first_update) {
+                || $.first_update
+                || this.page_updated) {
+                
+                this.page_updated = false;
+                
                 if (this.is_origin) {
                     // Remove vision if event is moved outside of map
                     if (this.x >= $dataMap.width || this.x < 0
@@ -1105,6 +1109,23 @@ if (Imported['MVCommons'] === undefined) {
 
         return false;
     }
+    
+    var Old_Game_Event_setupPageSettings = Game_Event.prototype.setupPageSettings;
+    Game_Event.prototype.setupPageSettings = function() {
+        Old_Game_Event_setupPageSettings.call(this);
+
+        this.is_origin = this.searchComment('fow_origin') ? true : this.is_origin;
+        this.is_target = this.searchComment('fow_target') ? true : this.is_target;
+        var range = parseInt(this.searchComment('fow_origin_range'));
+        this.vision_range = (Number.isInteger(range)) ? range : this.vision_range;
+        var type = parseInt(this.searchComment('fow_origin_type'));
+        this.vision_type = (Number.isInteger(type)) ? type : this.vision_type;
+        this.flying_vision = (this.searchComment('fow_origin_flying')) ? true : this.flying_vision;
+        var brightness = parseFloat(this.searchComment('fow_origin_brightness'));
+        this.vision_brightness = (!Number.isNaN(brightness)) ? brightness : this.vision_brightness;
+        
+        this.page_updated = true;
+    };
 
     // ===Alias Game_Player===
     var old_Game_Player_initialize = Game_Player.prototype.initialize;
@@ -1444,14 +1465,7 @@ if (Imported['MVCommons'] === undefined) {
                     break;
                 case 'add_target':
                     if (!Number.isNaN(args[1])) {
-                        var e = $gameMap.event(parseInt(args[1]));
-                        e.is_target = true;
-                        e.updateFloor();
-                        if ($gameSystem.fow_enabled && $.tileVisible(e)) {
-                            e._transparent = false;
-                        } else {
-                            e._transparent = true;
-                        }
+                        $.addTarget($gameMap.event(parseInt(args[1])));
                     }
                     break;
                 case 'remove_target':
