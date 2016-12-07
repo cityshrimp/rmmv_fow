@@ -1,7 +1,7 @@
 /*=============================================================================
  * CityShrimp's Fog of War System
  * CS_FogOfWar.js
- * Version: 1.0.2a
+ * Version: 1.1.0
  * Free for commercial and non commercial use.
  *=============================================================================*/
 
@@ -165,6 +165,9 @@
  * <fow_target>
  * desc: Event will be hidden unless on a revealed tile.
  *
+ * <fow_blocker: (type)>
+ * desc: Event will block vision.  1 - Can see through on elevated terrain (hill), 2 - Can reveal, but not see through (mountain), 0 - not blocker
+ *
  * ===Plugin Commands===
  *
  * cs_fow enable
@@ -218,11 +221,23 @@
  * cs_fow remove_all_targets
  * desc: Remove all targets, excluding events with <fow_target> notetag.  Does not persist if map changes.
  *
+ * cs_fow add_blocker <event id> <type>
+ * desc: Event will block vision. Does not persist if map changes. 1 - Can see through on elevated terrain (hill), 2 - Can reveal, but not see through (mountain), 0 - not blocker
+ *
+ * cs_fow_remove_blocker <event id>
+ * desc: Remove the event from blocker list.  Does not work on events with <fow_blocker> notetag.  Does not persist if map changes.
+ *
+ * cs_fow remove_all_blockers
+ * desc: Remove all blockers, excluding events with <fow_blocker> notetag.  Does not persist if map changes.
+ *
  * ===Limitation and Notes===
  * - Does not work with maps with loop
  * - Targets may not show/hide correctly if they are bigger than 1 tile
  * - Performance may become an issue if 1) map is too large, 2) too many origins, 3) heavy use of circle or directinoal vision type, or 4) origin vision is too large
- *
+ * - All calclulations are "tile-based".  E.g., if an blocker event stands between two tiles, it will find which tile it's coordinates are on, and block vision for that tile only.
+ * - If a tile is marked as a special region and also contains a blocker event, it will take the more restrictive of the two.  Example, if there's a blocker event (type 2 - mountain) on a hill tile.  It will block vision like a mountain.
+ * - If an event initially starts had <fow_blocker> tag in comment, and then move into a page without the tag, it will continue to act as a blocker.  To clear it, make sure to include <fow_blocker: 0> in the new page.  This is done to preserve blockers added via plugin commands.
+ * 
  * @help
  * ============================================================================
  * Latest Version
@@ -235,7 +250,7 @@
 */
 
 var Imported = Imported || {};
-Imported['CS_FogOfWar'] = "1.0.2a";
+Imported['CS_FogOfWar'] = "1.1.0";
 
 var CS_FogOfWar = CS_FogOfWar || {};
 
@@ -383,10 +398,12 @@ if (Imported['MVCommons'] === undefined) {
         if ($.visible_sets[e.eventId()] == undefined)
             $.visible_sets[e.eventId()] = new CS_Set();
         
-        // Don't do anything if event is outside of map
+        // Remove vision if it's outside
         if (e.x >= $dataMap.width || e.x < 0
-            || e.y >= $dataMap.height || e.y < 0)
+            || e.y >= $dataMap.height || e.y < 0) {
+            $.removeVision(e);
             return;
+        }
 
         // Check edge points
         var range = this._getRange(e);
@@ -566,17 +583,17 @@ if (Imported['MVCommons'] === undefined) {
                         
                         if (first_point[0] != second_point[0] && first_point[1] != second_point[1]) {
                             if (second_point[0] > first_point[0] && second_point[1] > first_point[1]) {
-                                var left_region_id = $gameMap.regionId(cur_x, cur_y - 1);
-                                var right_region_id = $gameMap.regionId(cur_x - 1, cur_y);
+                                var left_region_id = $.getRegionType(cur_x, cur_y - 1);
+                                var right_region_id = $.getRegionType(cur_x - 1, cur_y);
                             } else if (second_point[0] < first_point[0] && second_point[1] < first_point[1]) {
-                                var left_region_id = $gameMap.regionId(cur_x, cur_y + 1);
-                                var right_region_id = $gameMap.regionId(cur_x + 1, cur_y);
+                                var left_region_id = $.getRegionType(cur_x, cur_y + 1);
+                                var right_region_id = $.getRegionType(cur_x + 1, cur_y);
                             } else if (second_point[0] > first_point[0] && second_point[1] < first_point[1]) {
-                                var left_region_id = $gameMap.regionId(cur_x, cur_y + 1);
-                                var right_region_id = $gameMap.regionId(cur_x - 1, cur_y);
+                                var left_region_id = $.getRegionType(cur_x, cur_y + 1);
+                                var right_region_id = $.getRegionType(cur_x - 1, cur_y);
                             } else if (second_point[0] < first_point[0] && second_point[1] > first_point[1]) {
-                                var left_region_id = $gameMap.regionId(cur_x, cur_y - 1);
-                                var right_region_id = $gameMap.regionId(cur_x + 1, cur_y);
+                                var left_region_id = $.getRegionType(cur_x, cur_y - 1);
+                                var right_region_id = $.getRegionType(cur_x + 1, cur_y);
                             }
                             // Unit have limited visibility
                             if (origin_height == 0) {   
@@ -614,7 +631,7 @@ if (Imported['MVCommons'] === undefined) {
                 }
 
                 // Only need to check if unit isn't flying
-                var point_region_id = $gameMap.regionId(cur_x, cur_y);
+                var point_region_id = $.getRegionType(cur_x, cur_y);
                 if (! e.flying_vision) {
                     if (point_region_id == $._blocker_region_id) {
                         break;
@@ -768,6 +785,29 @@ if (Imported['MVCommons'] === undefined) {
         return ($gameMap.regionId(e.floorX, e.floorY) == regionId);
     }
     
+    $.getRegionType = function(x, y) {
+        var region_type = $gameMap.regionId(x, y);
+        var blocker_type = $.getBlockerTypeOnTile(x, y);
+        if (blocker_type == 1) {
+            // Hill type blocker
+            if (region_type == undefined || region_type == 0)
+                return $._hill_region_id;
+            else
+                return region_type;
+        } else if (blocker_type == 2) {
+            // Mountain type blocker
+            if (region_type == undefined
+                || region_type == 0
+                || region_type == $._hill_region_id
+                || region_type == $._forest_region_id)
+                return $._mountain_region_id;
+            else
+                return region_type;
+        }
+        
+        return region_type;
+    }
+    
     $.addOrigin = function(e) {
         e.is_origin = true;
         e.updateFloor();
@@ -804,6 +844,47 @@ if (Imported['MVCommons'] === undefined) {
         }
         
         return targets;
+    }
+    
+    $.addBlocker = function(e, type) {
+        e.blocker_type = type;
+        var tile = $._fog_tiles[e.floorX][e.floorY];
+        
+        for (let key of tile.gradient_map.keys()) {
+            var origin = $gameMap.event(key);
+            if (origin != undefined && origin.is_origin)
+                $.applyVision(origin);
+        }
+    }
+    
+    $.removeBlocker = function(e) {
+        e.blocker_type = 0;
+        var tile = $._fog_tiles[e.floorX][e.floorY];
+        
+        for (let key of tile.gradient_map.keys()) {
+            var origin = $gameMap.event(key);
+            if (origin != undefined && origin.is_origin)
+                $.applyVision(origin);
+        }
+    }
+    
+    $.getBlockers = function() {
+        var blockers = new Array();
+        for (let e of $gameMap.events()) {
+            if (e.blocker_type != 0)
+                blockers.push(e);
+        }
+        
+        return blockers;
+    }
+    
+    $.getBlockerTypeOnTile = function(x, y) {
+        for (let e of $gameMap.events()) {
+            if (e.blocker_type != 0 && e.floorX == x && e.floorY == y) 
+                return e.blocker_type;
+        }
+    
+        return 0;
     }
 
     // ===CS_Set Prototype===
@@ -982,25 +1063,43 @@ if (Imported['MVCommons'] === undefined) {
                 || $.first_update
                 || this.page_updated) {
                 
-                this.page_updated = false;
-                
-                if (this.is_origin) {
-                    // Remove vision if event is moved outside of map
-                    if (this.x >= $dataMap.width || this.x < 0
-                       || this.y >= $dataMap.height || this.y < 0)
-                        $.removeVision(this);
-                    else    
-                        $.applyVision(this);
-                }
+                if (this.is_origin)
+                    $.applyVision(this);
                 
                 if (this.is_target)
                     this.setTransparent(($._fog_tiles[this.floorX][this.floorY].gradient_map.size < 2));
+                
+                if ((this.blocker_type != undefined && this.blocker_type != 0)
+                    || this.page_updated) {
+                    
+                    var event_ids = new Set();
+                    var tile = $._fog_tiles[this.floorX][this.floorY];
+                    for (let key of tile.gradient_map.keys())
+                        event_ids.add(key);
+                    tile = $._fog_tiles[this.oldFloorX][this.oldFloorY];
+                    for (let key of tile.gradient_map.keys())
+                        event_ids.add(key);
+
+                    for (let key of event_ids) {
+                        if (key == 0) {
+                            if ($gamePlayer.is_origin)
+                                $.applyVision($gamePlayer);
+                        } else {
+                            var origin = $gameMap.event(key);
+                            if (origin != undefined && origin.is_origin) {
+                                $.applyVision(origin);
+                            }
+                        }
+                    }
+                }
                 
                 this.oldX = this._x;
                 this.oldY = this._y;
                 this.oldFloorX = this.floorX;
                 this.oldFloorY = this.floorY;
                 this.oldDirection = this.direction();
+                
+                this.page_updated = false;
             }
         }
     };
@@ -1084,6 +1183,12 @@ if (Imported['MVCommons'] === undefined) {
         this.is_origin = this.searchComment('fow_origin') ? true : this.is_origin;
         this.is_target = (MVC.getProp(data_e.meta, 'fow_target')) ? true : false;
         this.is_target = this.searchComment('fow_target') ? true : this.is_target;
+        if (MVC.getProp(data_e.meta, 'fow_blocker') != undefined)
+            this.blocker_type = parseInt(MVC.getProp(data_e.meta, 'fow_blocker'));
+        else
+            this.blocker_type = 0;
+        if (this.searchComment('fow_blocker'))
+            this.blocker_type = parseInt(this.searchComment('fow_blocker'));
     }
         
     Game_Event.prototype.searchComment = function(term) {
@@ -1116,6 +1221,8 @@ if (Imported['MVCommons'] === undefined) {
 
         this.is_origin = this.searchComment('fow_origin') ? true : this.is_origin;
         this.is_target = this.searchComment('fow_target') ? true : this.is_target;
+        var blocker_type = parseInt(this.searchComment('fow_blocker'));
+        this.blocker_type = (Number.isInteger(blocker_type)) ? blocker_type : this.blocker_type;
         var range = parseInt(this.searchComment('fow_origin_range'));
         this.vision_range = (Number.isInteger(range)) ? range : this.vision_range;
         var type = parseInt(this.searchComment('fow_origin_type'));
@@ -1480,6 +1587,26 @@ if (Imported['MVCommons'] === undefined) {
                         if (e != null && e != undefined) {
                             if (! MVC.getProp($dataMap.events[e.eventId()].meta, 'fow_target'))
                                 e.is_target = false;
+                        }
+                    }
+                    break;
+                case 'add_blocker':
+                    if (!Number.isNaN(args[1]) && !Number.isNaN(args[2])) {
+                        $.addBlocker($gameMap.event(parseInt(args[1])), parseInt(args[2]));
+                    }
+                    break;
+                case 'remove_blocker':
+                    if (!Number.isNaN(args[1])) {
+                        var e = $gameMap.event(parseInt(args[1]));
+                        //if (! MVC.getProp($dataMap.events[e.eventId()].meta, 'fow_blocker'))
+                            $.removeBlocker(e);
+                    }
+                    break;
+                case 'remove_all_blockers':
+                    for (let e of $.getTargets()) {
+                        if (e != null && e != undefined) {
+                            //if (! MVC.getProp($dataMap.events[e.eventId()].meta, 'fow_blocker'))
+                                $.removeBlocker(e);
                         }
                     }
                     break;
