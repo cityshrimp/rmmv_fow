@@ -3,7 +3,7 @@ Fog of War System for RPG Maker MV
 
 Author: CityShrimp
 
-Version: 1.0.0
+Version: 1.1.0
 
 Features
 ========
@@ -15,7 +15,9 @@ Features
 6. Vision Brightness - Each origin has it's own vision brightness
 7. Map Hidden - Entire map is initially blacked out, and map is revealed by origins
 8. Strict Diagonals - Can configure whether origins can see past two diagonally-placed blocked tiles
-9. Tile Type by RegionId:
+9. Targets - Events can be marked as a target.  Targets will disappear when it stands on a fogged tile
+10. Blockers - Events can be marked as a blocker.  Blockers can block vision. 
+11. Tile Type by RegionId:
   - Plain: Can always see through
   - Forest: Cannot see through unless on a hill, mountain, watchtower, or have flying vision
   - Hill: Cannot see through unless on a hill, mountain, watchtower, or have flying vision
@@ -23,7 +25,7 @@ Features
   - Dark: Can always see through, but can never be revealed
   - Blocked: Cannot see through unless have flying vision. Can never be revealed.
   - Watchtower: Can always see through. Have elevated height (can be configured)
-10. Multiple ways to configure: Plugin Parameters, Map/Event notetags, Plugin Commands
+12. Multiple ways to configure: Plugin Parameters, Map/Event notetags, Plugin Commands
 
 Instructions
 ============
@@ -82,4 +84,9 @@ Notes and Limitations
 - Directional vision should work with most 8-direction movement plugins.
 - Targets may not show/hide correctly if they are bigger than 1 tile
 - Performance may become an issue if 1) map is too large, 2) too many origins, or 3) vision is too large
+- Only tested with 48x48 tile size.  Most likely will not work if a different tile size was used.
 - Never tested with Vehicles
+- All calclulations are "tile-based".  E.g., if an blocker event stands between two tiles, it will find which tile it's coordinates are on, and block vision for that tile only.
+- If a tile is marked as a special region and also contains a blocker event, it will take the more restrictive of the two.  Example, if there's a blocker event (type 2 - mountain) on a hill tile.  It will block vision like a mountain.
+- If an event initially starts had <fow_blocker> tag in comment, and then move into a page without the tag, it will continue to act as a blocker.  To clear it, make sure to include <fow_blocker: 0> in the new page.  This is done to preserve blockers added via plugin commands.
+
