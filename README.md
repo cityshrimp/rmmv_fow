@@ -88,5 +88,5 @@ Notes and Limitations
 - Never tested with Vehicles
 - All calclulations are "tile-based".  E.g., if an blocker event stands between two tiles, it will find which tile it's coordinates are on, and block vision for that tile only.
 - If a tile is marked as a special region and also contains a blocker event, it will take the more restrictive of the two.  Example, if there's a blocker event (type 2 - mountain) on a hill tile.  It will block vision like a mountain.
-- If an event initially starts had <fow_blocker> tag in comment, and then move into a page without the tag, it will continue to act as a blocker.  To clear it, make sure to include <fow_blocker: 0> in the new page.  This is done to preserve blockers added via plugin commands.
+- If an event initially starts had \<fow_blocker\> tag in comment, and then move into a page without the tag, it will continue to act as a blocker.  To clear it, make sure to include \<fow_blocker: 0\> in the new page.  This is done to preserve blockers added via plugin commands.
 
