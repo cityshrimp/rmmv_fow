@@ -1200,7 +1200,7 @@ if (Imported['MVCommons'] === undefined) {
     Game_Event.prototype.searchComment = function(term) {
         var comment = "";
         if(!this.page())
-            return value;
+            return false;
         var pagelist = this.page().list;
         for (var cmd of pagelist) {
             if(cmd.code == 108)   comment += cmd.parameters[0] + "\n";
