@@ -1,7 +1,7 @@
 /*=============================================================================
  * CityShrimp's Fog of War System
  * CS_FogOfWar.js
- * Version: 1.1.0
+ * Version: 1.1.1
  * Free for commercial and non commercial use.
  *=============================================================================*/
 
@@ -250,7 +250,7 @@
 */
 
 var Imported = Imported || {};
-Imported['CS_FogOfWar'] = "1.1.0";
+Imported['CS_FogOfWar'] = "1.1.1";
 
 var CS_FogOfWar = CS_FogOfWar || {};
 
@@ -1054,6 +1054,12 @@ if (Imported['MVCommons'] === undefined) {
         old_Game_CharacterBase_update.call(this);
 
         this.updateFloor();
+        
+        // Don't need to check if character is outside of map
+        if (this.floorX >= $gameMap.width || this.floorX < 0
+           || this.floorY >= $gameMap.height || this.floorY <0)
+            return;
+        
         // Apply vision after move if fog is enabled and event is an origin
         if ($gameSystem.fow_enabled) {
             // Only make an update if there's a change in position or direction.  To speed up performance
