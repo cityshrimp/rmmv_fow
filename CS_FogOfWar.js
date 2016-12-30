@@ -1,7 +1,7 @@
 /*=============================================================================
  * CityShrimp's Fog of War System
  * CS_FogOfWar.js
- * Version: 1.1.1
+ * Version: 1.1.2
  * Free for commercial and non commercial use.
  *=============================================================================*/
 
@@ -250,7 +250,7 @@
 */
 
 var Imported = Imported || {};
-Imported['CS_FogOfWar'] = "1.1.1";
+Imported['CS_FogOfWar'] = "1.1.2";
 
 var CS_FogOfWar = CS_FogOfWar || {};
 
@@ -399,8 +399,7 @@ if (Imported['MVCommons'] === undefined) {
             $.visible_sets[e.eventId()] = new CS_Set();
         
         // Remove vision if it's outside
-        if (e.x >= $dataMap.width || e.x < 0
-            || e.y >= $dataMap.height || e.y < 0) {
+        if (! $.inMap(e.x, e.y)) {
             $.removeVision(e);
             return;
         }
@@ -444,10 +443,21 @@ if (Imported['MVCommons'] === undefined) {
     }
 
     $.tileVisible = function(event) {
+        if (! $.inMap(event.x, event.y))
+            return false;
+        
         if (this._fog_tiles[event.x][event.y].gradient_map.size >= 2)
             return true;
         else
             return false;
+    }
+    
+    $.inMap = function(x, y) {
+        if (x < 0 || x >= $dataMap.width
+           || y < 0 || y >= $dataMap.height)
+            return false;
+        
+        return true;
     }
 
     // Checks tiles around origin and mark them as visible or blocked
@@ -505,8 +515,7 @@ if (Imported['MVCommons'] === undefined) {
                 var cur_y = pointArray[i][1] + e.floorY;
 
                 // Stop if reach outside of map
-                if (cur_x >= $dataMap.width || cur_x < 0
-                    || cur_y >= $dataMap.height || cur_y < 0)
+                if (! $.inMap(cur_x, cur_y))
                     break;
 
                 // For Directional Vision only.  Need to limit vision based on direction
@@ -1056,8 +1065,7 @@ if (Imported['MVCommons'] === undefined) {
         this.updateFloor();
         
         // Don't need to check if character is outside of map
-        if (this.floorX >= $gameMap.width || this.floorX < 0
-           || this.floorY >= $gameMap.height || this.floorY <0)
+        if (! $.inMap(this.floorX, this.floorY))
             return;
         
         // Apply vision after move if fog is enabled and event is an origin
