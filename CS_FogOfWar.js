@@ -1,7 +1,7 @@
 /*=============================================================================
  * CityShrimp's Fog of War System
  * CS_FogOfWar.js
- * Version: 1.1.2
+ * Version: 1.1.3
  * Free for commercial and non commercial use.
  *=============================================================================*/
 
@@ -233,7 +233,7 @@
  * ===Limitation and Notes===
  * - Does not work with maps with loop
  * - Targets may not show/hide correctly if they are bigger than 1 tile
- * - Performance may become an issue if 1) map is too large, 2) too many origins, 3) heavy use of circle or directinoal vision type, or 4) origin vision is too large
+ * - Performance may become an issue if 1) too many origins, 3) heavy use of circle or directinoal vision type, or 4) origin vision is too large
  * - All calclulations are "tile-based".  E.g., if an blocker event stands between two tiles, it will find which tile it's coordinates are on, and block vision for that tile only.
  * - If a tile is marked as a special region and also contains a blocker event, it will take the more restrictive of the two.  Example, if there's a blocker event (type 2 - mountain) on a hill tile.  It will block vision like a mountain.
  * - If an event initially starts had <fow_blocker> tag in comment, and then move into a page without the tag, it will continue to act as a blocker.  To clear it, make sure to include <fow_blocker: 0> in the new page.  This is done to preserve blockers added via plugin commands.
@@ -250,7 +250,7 @@
 */
 
 var Imported = Imported || {};
-Imported['CS_FogOfWar'] = "1.1.2";
+Imported['CS_FogOfWar'] = "1.1.3";
 
 var CS_FogOfWar = CS_FogOfWar || {};
 
@@ -317,13 +317,11 @@ if (Imported['MVCommons'] === undefined) {
     $.after_load = false;
     
     // Create fog sprites and sight count map
-    $.init = function() {  
+    $.init = function() {
         for (var i = 0; i < $dataMap.width; i++) {
             for (var j = 0; j < $dataMap.height; j++) {
                 this._fog_tiles[i][j].visible = true;
                 this._fog_tiles[i][j].addGradient(-1, 1 - $gameSystem.fow_fog_opacity);
-                this._fog_tiles[i][j].x = (i - $gameMap.displayX())*48;
-                this._fog_tiles[i][j].y = (j - $gameMap.displayY())*48;
             }
         }
 
@@ -951,38 +949,38 @@ if (Imported['MVCommons'] === undefined) {
     }
     // ===End CS_Set Prototype===
 
-    // ===Fog Sprite Prototype===
-    function FogSprite() {
+    // ===Fog Tile Prototype===
+    function FogTile() {
         this.initialize.apply(this, arguments);
     };
-    FogSprite.prototype = Object.create(Sprite_Base.prototype);
-    FogSprite.prototype.constructor = FogSprite;
 
-    FogSprite.prototype.initialize = function(x, y) {
-        Sprite_Base.prototype.initialize.call(this);
+    FogTile.prototype = Object.create(Object.prototype);
+    FogTile.prototype.constructor = FogTile;
+
+    FogTile.prototype.initialize = function(x, y) {
         this.gradient_map = new Map();
         this.visible = false;
         this.mapX = x;
         this.mapY = y;
-        this.targetOpacity = this.opacity;
+        this.targetOpacity = this.opacity = 255;
 
         return this;
     }
 
     // event_id = -1 is reserved for map hidden.  When tile is revealed, adds pair (-1, <opacity>)
-    FogSprite.prototype.addGradient = function(event_id, opacity) {
+    FogTile.prototype.addGradient = function(event_id, opacity) {
         this.gradient_map.set(event_id, opacity);
         this.updateOpacity();
     }
 
-    FogSprite.prototype.removeGradient = function(event_id) {
+    FogTile.prototype.removeGradient = function(event_id) {
         if (this.gradient_map.has(event_id)) {
             this.gradient_map.delete(event_id);
             this.updateOpacity();
         }
     }
 
-    FogSprite.prototype.updateOpacity = function() {
+    FogTile.prototype.updateOpacity = function() {
         var new_opacity = 1;
 
         this.gradient_map.forEach(function(value) {
@@ -993,18 +991,16 @@ if (Imported['MVCommons'] === undefined) {
         this.targetOpacity = new_opacity * 255;
     }
 
-    FogSprite.prototype.clearGradient = function () {
+    FogTile.prototype.clearGradient = function () {
         this.gradient_map = new Map();
         this.updateOpacity();
     }
 
-    FogSprite.prototype.deleteSprite = function() {
+    FogTile.prototype.deleteSprite = function() {
         this.parent.removeChild(this);
     }
 
-    FogSprite.prototype.update = function() {
-        Sprite_Base.prototype.update.call(this);
-        
+    FogTile.prototype.update = function() {
         // Check each tile for change in opacity
         if (this.opacity > this.targetOpacity) {
             var temp = this.opacity - $.fade_speed;
@@ -1020,6 +1016,50 @@ if (Imported['MVCommons'] === undefined) {
                 this.opacity = temp;
         }
     }
+    // ===Fog Tile Prototype===
+
+    // ===Fog Sprite Prototype===
+    function FogSprite() {
+        this.initialize.apply(this, arguments);
+    };
+
+    FogSprite.prototype = Object.create(Sprite_Base.prototype);
+    FogSprite.prototype.constructor = FogSprite;
+
+    FogSprite.prototype.initialize = function(x, y) {
+        Sprite_Base.prototype.initialize.call(this);
+        this.tileX = x;
+        this.tileY = y;
+        return this;
+    }
+
+    FogSprite.prototype.deleteSprite = function() {
+        this.parent.removeChild(this);
+    }
+
+    FogSprite.prototype.update = function() {
+        Sprite_Base.prototype.update.call(this);
+
+        let displayX = $gameMap.displayX();
+        let displayY = $gameMap.displayY();
+
+        var tileX = Math.floor(displayX + this.tileX);
+        var tileY = Math.floor(displayY + this.tileY);
+
+        if (tileX >= $gameMap.width() || tileY >= $gameMap.height()) {
+            return; // This tile is not visible
+        }
+
+        let tile = $._fog_tiles[tileX][tileY];
+        if (!tile) {
+            console.info(tileX, tileY);
+        }
+        tile.update();
+
+        this.x = (this.tileX - displayX + Math.floor(displayX)) * 48;
+        this.y = (this.tileY - displayY + Math.floor(displayY)) * 48;
+        this.opacity = tile.opacity;
+    }
     // ===Fog Sprite Prototype===
 
     // ===Alias Spriteset_Map===
@@ -1031,10 +1071,25 @@ if (Imported['MVCommons'] === undefined) {
         for (var i = 0; i < $dataMap.width; i++) {
             $._fog_tiles[i] = new Array($dataMap.height);
             for (var j = 0; j < $dataMap.height; j++) {
+                var tile = new FogTile(i, j);
+                $._fog_tiles[i][j] = tile;
+            }
+        }
+
+        let width = Graphics.width / 48 + 1;
+        let height = Graphics.height / 48 + 1;
+
+        $._fog_sprites = new Array(width);
+
+        for (var i = 0; i < width; i++) {
+            $._fog_sprites[i] = new Array(height);
+            for (var j = 0; j < height; j++) {
                 var sprite = new FogSprite(i, j);
-                $._fog_tiles[i][j] = sprite;
+                $._fog_sprites[i][j] = sprite;
                 sprite.bitmap = $.bitmap;
                 this.addChild(sprite);
+                this.tileX = i;
+                this.tileY = j;
                 sprite.x = i*48;
                 sprite.y = j*48;
             }
@@ -1409,30 +1464,7 @@ if (Imported['MVCommons'] === undefined) {
     Scene_Map.prototype.update = function() {    
         old_Scene_Map_update.call(this);
         
-        if ($gameSystem.fow_enabled) {
-            var realX = $gameMap.displayX();
-            var realY = $gameMap.displayY();
-            var tileX = this.oldX.floor();
-            var tileY = this.oldY.floor();
-            
-            if (this.oldX != realX || this.oldY != realY) {
-                for (var i = 0; i < $dataMap.width; i++)
-                    for (var j = 0; j < $dataMap.height; j++) {
-                        $._fog_tiles[i][j].x = (i - realX)*48;
-                        $._fog_tiles[i][j].y = (j - realY)*48;
-                    }
-            } else if ($.first_update) {
-                $.first_update = false;
-                for (var i = 0; i < $dataMap.width; i++)
-                    for (var j = 0; j < $dataMap.length; j++) {
-                        $._fog_tiles[i][j].x = (i - realX)*48;
-                        $._fog_tiles[i][j].y = (j - realY)*48;
-                    }
-            }
-            
-            this.oldX = realX;
-            this.oldY = realY;
-        } else if (!$gameSystem.fow_enabled && $._fog_tiles[0][0].visible) {
+        if (!$gameSystem.fow_enabled && $._fog_tiles[0][0].visible) {
             $.clear();
         }
     }
