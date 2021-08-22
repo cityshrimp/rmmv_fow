@@ -1,7 +1,7 @@
 /*=============================================================================
  * CityShrimp's Fog of War System
  * CS_FogOfWar.js
- * Version: 1.1.3
+ * Version: 1.1.4
  * Free for commercial and non commercial use.
  *=============================================================================*/
 
@@ -1046,19 +1046,15 @@ if (Imported['MVCommons'] === undefined) {
         var tileX = Math.floor(displayX + this.tileX);
         var tileY = Math.floor(displayY + this.tileY);
 
-        if (tileX >= $gameMap.width() || tileY >= $gameMap.height()) {
-            return; // This tile is not visible
+        if (0 <= tileX && tileX < $gameMap.width() && 0 <= tileY && tileY < $gameMap.height()) {
+            const tile = $._fog_tiles[tileX][tileY];
+            tile.update();
+            this.visible = tile.visible;
+            this.opacity = tile.opacity;
         }
-
-        let tile = $._fog_tiles[tileX][tileY];
-        if (!tile) {
-            console.info(tileX, tileY);
-        }
-        tile.update();
 
         this.x = (this.tileX - displayX + Math.floor(displayX)) * 48;
         this.y = (this.tileY - displayY + Math.floor(displayY)) * 48;
-        this.opacity = tile.opacity;
     }
     // ===Fog Sprite Prototype===
 
