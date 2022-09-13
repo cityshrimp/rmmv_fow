@@ -2,7 +2,7 @@
  * CityShrimp's Cover Tiles
  * CS_CoverTiles.js
  * Version: 1.0.0
- * Free for commercial and non commercial use.
+ * SPDX-License-Identifier: MIT
  *=============================================================================*/
 
  /*:
