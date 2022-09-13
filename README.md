@@ -3,7 +3,7 @@ Fog of War System for RPG Maker MV
 
 Author: CityShrimp
 
-Version: 1.1.2
+Version: 1.1.4
 
 Features
 ========

@@ -2,7 +2,7 @@
  * CityShrimp's Fog of War System
  * CS_FogOfWar.js
  * Version: 1.1.4
- * Free for commercial and non commercial use.
+ * SPDX-License-Identifier: MIT
  *=============================================================================*/
 
  /*:
